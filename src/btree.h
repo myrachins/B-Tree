@@ -204,6 +204,9 @@ public:
         /** \brief Копирует набор курсоров принципиально как и в методе copyKeys(). */
         inline void copyCursors(Byte* dst, const Byte* src, UShort num);
 
+        /** \brief Копирует курсор в адрес \c dst из адреса \c src. */
+        inline void copyCursor(Byte* dst, const Byte* src);
+
 
 
         /** \brief Перегруженный константный вариант метода getKey(). */

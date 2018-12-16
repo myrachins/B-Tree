@@ -134,14 +134,31 @@ xi::UInt BaseBTree::allocNewRootPage(PageWrapper& pw)
 
 Byte* BaseBTree::search(const Byte* k)
 {
-    // TODO: релаизовать студентам!
-    return nullptr;
+    // This method based on Cormen implementation
+    PageWrapper currentNode(this);
+    currentNode.readPage(_rootPageNum);
+
+    do
+    {
+        UShort keyNum = currentNode.getKeysNum();
+
+        UShort offset = 0;
+        while (offset < keyNum && _comparator->compare(currentNode.getKey(offset), k, _recSize))
+            ++offset;
+
+        if(offset < keyNum && _comparator->isEqual(currentNode.getKey(offset), k, _recSize))
+            return currentNode.getKey(offset);
+
+        currentNode.readPageFromChild(currentNode, offset);
+    }
+    while (!currentNode.isLeaf());
+
+    return nullptr; // if nothing was found
 }
 
 int BaseBTree::searchAll(const Byte* k, std::list<Byte*>& keys)
 {
-    // TODO: релаизовать студентам!   
-    //return 0;
+    return 0;
 }
 
 //UInt BaseBTree::allocPageInternal(UShort keysNum, NodeType nt, PageWrapper& pw)
@@ -363,6 +380,25 @@ void BaseBTree::reallocWorkPages()
     _rootPage.reallocData(_nodePageSize);
 }
 
+void BaseBTree::insert(const Byte *k)
+{
+    // this method is based on Cormen realisation
+    UInt r = _rootPage.getPageNum(); // memorizing previous root
+
+    if(_rootPage.isFull()) // if root is full
+    {
+        _rootPage.allocNewRootPage(); // creating new root
+        _rootPageNum = _rootPage.getPageNum(); // updating page num
+
+        _rootPage.setKeyNum(0); // setting number of keys to 0
+        _rootPage.setCursor(0, r); // linking new root to the previous
+
+        _rootPage.splitChild(0); // splitting child
+        _rootPage.insertNonFull(k); // inserting key
+    } else // if root is not full simply insert to it
+        _rootPage.insertNonFull(k);
+}
+
 
 //==============================================================================
 // class BaseBTree::PageWrapper
@@ -515,6 +551,15 @@ void BaseBTree::PageWrapper::copyCursors(Byte* dst, const Byte* src, UShort num)
         );
 }
 
+void BaseBTree::PageWrapper::copyCursor(Byte* dst, const Byte* src)
+{
+    memcpy(
+            dst,                        // куда
+            src,                        // откуда
+            CURSOR_SZ             // размер
+    );
+}
+
 UInt BaseBTree::PageWrapper::getCursor(UShort cnum)
 {
     //if (cnum > getKeysNum())
@@ -610,10 +655,39 @@ void BaseBTree::PageWrapper::splitChild(UShort iChild)
     if (iChild > getKeysNum())
         throw std::invalid_argument("Cursor not exists");
 
+    // This method is based on Cormen's realization
+    PageWrapper y(_tree); // left child (in near future)
+    PageWrapper z(_tree); // right child (in near future)
 
-    // TODO: реализовать студентам
+    y.readPageFromChild(*this, iChild); // by now y will contain hole node we want to split
+    z.allocPage(_tree->getOrder() - 1, y.isLeaf()); // real creation of z (future sibling of y)
 
-    //...
+    for(UShort i = 0; i < _tree->getOrder() - 1; i++) // coping keys after median of y to the sibling z
+        z.copyKey(z.getKey(i), y.getKey(_tree->getOrder() + i));
+
+    if(!y.isLeaf()) // if splitting child is not leaf and has his own children
+    {
+        for (UShort i = 0; i < _tree->getOrder(); i++) // coping child after median of y to the sibling z
+            z.copyCursor(z.getCursorPtr(i), y.getCursorPtr(_tree->getOrder() + i));
+    }
+
+    setKeyNum(getKeysNum() + 1); // increasing the number of keys in parent
+
+    for(int i = getKeysNum() - 1; i >= iChild + 1; i--) // shifting right part of parent's children to the right
+        copyCursor(getCursorPtr(i + 1), getCursorPtr(i));
+
+    setCursor(iChild + 1, z.getPageNum()); // inserting link to the new child z
+
+    for(int i = getKeysNum() - 2; i > iChild; i--) // shifting right part of parent keys to the right
+        copyKey(getKey(i + 1), getKey(i));
+
+    copyKey(getKey(iChild), y.getKey(_tree->getOrder() - 1)); // inserting new key to the parent
+    y.setKeyNum(_tree->getOrder() - 1); // cutting right part of splitting node
+
+    // saving changes to the storage
+    y.writePage();
+    z.writePage();
+    writePage();
 }
 
 
@@ -626,9 +700,40 @@ void BaseBTree::PageWrapper::insertNonFull(const Byte* k)
     if (!c)
         throw std::runtime_error("Comparator not set. Can't insert");
 
-    // TODO: реализовать студентам
+    // This method is based on Cormen realisation
+    int i = getKeysNum() - 1;
 
-    //...
+    if(isLeaf()) // if it's leaf, just simply insert to current node
+    {
+        setKeyNum(getKeysNum() + 1); // increasing number of keys in node
+        while (i >= 0 && c->compare(k, getKey(i), _tree->_recSize)) // shifting right part to the part
+        {
+            copyKey(getKey(i + 1), getKey(i));
+            i--;
+        }
+        copyKey(getKey(i + 1), k); // inserting element
+        writePage(); // saving changes to the store
+        return;
+    }
+    // In case it's not a leaf
+    while (i >= 0 && c->compare(k, getKey(i), _tree->_recSize))
+        i--;
+
+    i++; // going to the last element, that fits condition
+
+    PageWrapper s(_tree); // creating child (in near future)
+    s.readPageFromChild(*this, i); // loading child from store
+
+    if(s.getKeysNum() == 2 * _tree->getOrder() - 1) // if child is full
+    {
+        splitChild(i); // split this child
+        if(c->compare(getKey(i), k, _tree->_recSize)) // researching to what sub tree we should go down
+            s.readPageFromChild(*this, i + 1);
+        else
+            s.readPageFromChild(*this, i);
+    }
+
+    s.insertNonFull(k); // recursion to the sub tree
 }
 
 
