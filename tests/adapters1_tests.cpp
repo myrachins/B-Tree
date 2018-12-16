@@ -4,12 +4,12 @@
 /// \author    Sergey Shershakov
 /// \version   0.1.0
 /// \date      01.05.2017
-///            This is a part of the course "Algorithms and Data Structures" 
-///            provided by  the School of Software Engineering of the Faculty 
+///            This is a part of the course "Algorithms and Data Structures"
+///            provided by  the School of Software Engineering of the Faculty
 ///            of Computer Science at the Higher School of Economics.
 ///
 /// Gtest-based unit test.
-/// The naming conventions imply the name of a unit-test module is the same as 
+/// The naming conventions imply the name of a unit-test module is the same as
 /// the name of the corresponding tested module with _test suffix
 ///
 ////////////////////////////////////////////////////////////////////////////////
@@ -86,7 +86,7 @@ TEST_F(AdaptersTest, IntAdapterCreate1)
 
     // основные свойства
     EXPECT_EQ(sizeof(int), tr.getRecSize());
-    EXPECT_EQ(2, tr.getOrder());                    // 
+    EXPECT_EQ(2, tr.getOrder());                    //
     EXPECT_EQ(1, tr.getLastPageNum());
     EXPECT_EQ(1, tr.getRootPageNum());
 }
@@ -97,7 +97,7 @@ TEST_F(AdaptersTest, IntAdSetGetKey1)
     std::string fn(TEST_FILES_PATH);
     fn.append("IntAdSetGetKey1.xibt");
 
-    BTreeIntAdapter bt;    
+    BTreeIntAdapter bt;
     bt.create(2, fn);
 
 
@@ -111,7 +111,7 @@ TEST_F(AdaptersTest, IntAdSetGetKey1)
     EXPECT_EQ(3, tr.getLastPageNum());
 
     // попишем в первую после корня страницу
-    
+
     //tr.readWorkPage(1);
     wp.readPage(2);
     bt.setKey(wp, 0, 0x55AA55aa);                   // 0-й ключ
@@ -128,7 +128,7 @@ TEST_F(AdaptersTest, IntAdSetGetKey1)
     //tr.writeWorkPage(2);
     wp.writePage();
 
-    
+
     // теперь почитаем обратно
     //tr.readWorkPage(1);
     wp.readPage(2);

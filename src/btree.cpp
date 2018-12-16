@@ -14,6 +14,7 @@
 
 #include <stdexcept>        // std::invalid_argument
 #include <cstring>          // memset
+#include <set>
 
 
 namespace xi {
@@ -134,31 +135,14 @@ xi::UInt BaseBTree::allocNewRootPage(PageWrapper& pw)
 
 Byte* BaseBTree::search(const Byte* k)
 {
-    // This method based on Cormen implementation
-    PageWrapper currentNode(this);
-    currentNode.readPage(_rootPageNum);
-
-    do
-    {
-        UShort keyNum = currentNode.getKeysNum();
-
-        UShort offset = 0;
-        while (offset < keyNum && _comparator->compare(currentNode.getKey(offset), k, _recSize))
-            ++offset;
-
-        if(offset < keyNum && _comparator->isEqual(currentNode.getKey(offset), k, _recSize))
-            return currentNode.getKey(offset);
-
-        currentNode.readPageFromChild(currentNode, offset);
-    }
-    while (!currentNode.isLeaf());
-
-    return nullptr; // if nothing was found
+    _rootPage.readPage(_rootPageNum);
+    return _rootPage.search(k);
 }
 
 int BaseBTree::searchAll(const Byte* k, std::list<Byte*>& keys)
 {
-    return 0;
+    _rootPage.readPage(_rootPageNum);
+    return _rootPage.searchAll(k, keys);
 }
 
 //UInt BaseBTree::allocPageInternal(UShort keysNum, NodeType nt, PageWrapper& pw)
@@ -678,7 +662,7 @@ void BaseBTree::PageWrapper::splitChild(UShort iChild)
 
     setCursor(iChild + 1, z.getPageNum()); // inserting link to the new child z
 
-    for(int i = getKeysNum() - 2; i > iChild; i--) // shifting right part of parent keys to the right
+    for(int i = getKeysNum() - 2; i >= iChild; i--) // shifting right part of parent keys to the right
         copyKey(getKey(i + 1), getKey(i));
 
     copyKey(getKey(iChild), y.getKey(_tree->getOrder() - 1)); // inserting new key to the parent
@@ -726,7 +710,7 @@ void BaseBTree::PageWrapper::insertNonFull(const Byte* k)
 
     if(s.getKeysNum() == 2 * _tree->getOrder() - 1) // if child is full
     {
-        splitChild(i); // split this child
+        splitChild(i); // splitting this child
         if(c->compare(getKey(i), k, _tree->_recSize)) // researching to what sub tree we should go down
             s.readPageFromChild(*this, i + 1);
         else
@@ -734,6 +718,58 @@ void BaseBTree::PageWrapper::insertNonFull(const Byte* k)
     }
 
     s.insertNonFull(k); // recursion to the sub tree
+}
+
+Byte *BaseBTree::PageWrapper::search(const Byte *key)
+{
+    // This method is based on Cormen implementation
+    UShort keyNum = getKeysNum();
+
+    UShort offset = 0; // iterating to the first bigger than this key
+    while (offset < keyNum && _tree->_comparator->compare(getKey(offset), key, _tree->_recSize))
+        ++offset;
+
+    if(offset < keyNum && _tree->_comparator->isEqual(getKey(offset), key, _tree->_recSize))
+        return getKey(offset); // if this key is what we were searched for, simply return it
+
+    if(!isLeaf()) // if not and it's not a leaf, going down to specified child
+    {
+        PageWrapper currentNode(_tree); // creating iterative node
+        currentNode.readPageFromChild(*this, offset);
+        return currentNode.search(key); // starting searching in the child
+    }
+
+    return nullptr; // if nothing was found
+}
+
+int BaseBTree::PageWrapper::searchAll(const Byte* key, std::list<Byte*>& keys)
+{
+    UShort keyNum = getKeysNum();
+
+    UShort offset = 0; // iterating to the first bigger than this key
+    while (offset < keyNum && _tree->_comparator->compare(getKey(offset), key, _tree->_recSize))
+        ++offset;
+
+    std::set<UShort> offsets; // set of all suitable offsets, where in children can be desired key
+    offsets.insert(offset); // adding default offset to search
+
+    while (offset < keyNum && _tree->_comparator->isEqual(getKey(offset), key, _tree->_recSize))
+    {
+        keys.push_back(getKey(offset)); // getting all equal keys from the current node
+        offsets.insert(offset++); // adding new possible offset to search
+    }
+
+    if(!isLeaf()) // if not and it's not a leaf, going down to specified child
+    {
+        for (const UShort item : offsets)
+        {
+            PageWrapper currentNode(_tree); // creating iterative node
+            currentNode.readPageFromChild(*this, item);
+            currentNode.searchAll(key, keys); // searching in the child
+        }
+    }
+
+    return keys.size(); // returning the number of keys
 }
 
 
