@@ -764,7 +764,7 @@ int BaseBTree::PageWrapper::searchAll(const Byte* key, std::list<Byte*>& keys)
         Byte* retPtr = new Byte();
         copyKey(retPtr, getKey(offset));
         keys.push_back(retPtr); // getting all equal keys from the current node
-        offsets.insert(offset++); // adding new possible offset to search
+        offsets.insert(++offset); // adding new possible offset to search
     }
 
     if(!isLeaf()) // if not and it's not a leaf, going down to specified child
