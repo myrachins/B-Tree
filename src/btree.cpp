@@ -761,7 +761,9 @@ int BaseBTree::PageWrapper::searchAll(const Byte* key, std::list<Byte*>& keys)
 
     while (offset < keyNum && _tree->_comparator->isEqual(getKey(offset), key, _tree->_recSize))
     {
-        keys.push_back(getKey(offset)); // getting all equal keys from the current node
+        Byte* retPtr = new Byte();
+        copyKey(retPtr, getKey(offset));
+        keys.push_back(retPtr); // getting all equal keys from the current node
         offsets.insert(offset++); // adding new possible offset to search
     }
 
