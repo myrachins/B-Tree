@@ -730,7 +730,11 @@ Byte *BaseBTree::PageWrapper::search(const Byte *key)
         ++offset;
 
     if(offset < keyNum && _tree->_comparator->isEqual(getKey(offset), key, _tree->_recSize))
-        return getKey(offset); // if this key is what we were searched for, simply return it
+    {
+        Byte* retPtr = new Byte();
+        copyKey(retPtr, getKey(offset));
+        return retPtr; // if this key is what we were searched for, simply return it
+    }
 
     if(!isLeaf()) // if not and it's not a leaf, going down to specified child
     {
@@ -752,6 +756,8 @@ int BaseBTree::PageWrapper::searchAll(const Byte* key, std::list<Byte*>& keys)
 
     std::set<UShort> offsets; // set of all suitable offsets, where in children can be desired key
     offsets.insert(offset); // adding default offset to search
+    if(offset > 0) // needed key can be on left part
+        offsets.insert(offset - 1);
 
     while (offset < keyNum && _tree->_comparator->isEqual(getKey(offset), key, _tree->_recSize))
     {
